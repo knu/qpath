@@ -99,9 +99,10 @@ gh	GitHub	/Users/you/src/github.com/	~/src/github.com/
 % qpath add gh ~/src/github.com/ --desc GitHub
 % qpath rename gh hub
 % qpath rm hub
+% qpath format
 ```
 
-Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add --overwrite` updates an existing entry in the target file, preserving fields not given on the command line; adding an abbreviation defined in another file is an error.  `remove` is an alias for `rm`.
+Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add --overwrite` updates an existing entry in the target file, preserving fields not given on the command line; adding an abbreviation defined in another file is an error.  `qpath format` re-sorts a file edited by hand and tidies its whitespace (trailing spaces, repeated blank lines).  `remove` is an alias for `rm`, and `fmt` for `format`.
 
 ### Cache
 

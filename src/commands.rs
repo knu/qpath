@@ -176,6 +176,19 @@ pub fn rm(dirs: &BaseDirs, abbr: &str, file: Option<PathBuf>, sort_by: SortBy) -
     edit::save(&target, &doc)
 }
 
+pub fn format(dirs: &BaseDirs, file: Option<PathBuf>, sort_by: SortBy) -> Result<()> {
+    let config_dir = dirs.qpath_config_dir();
+    let target = resolve_target(file.as_deref(), dirs, &config_dir);
+    if !target.exists() {
+        bail!("{} does not exist", target.display());
+    }
+
+    let mut doc = edit::open_doc(&target)?;
+    let tables = edit::path_tables(&mut doc)?;
+    edit::sort_tables(tables, sort_by.field());
+    edit::save(&target, &doc)
+}
+
 pub fn cache_clear(dirs: &BaseDirs, target: Option<CacheTarget>) -> Result<()> {
     let dir = match target {
         Some(CacheTarget::Shell) => dirs.qpath_cache_dir().join("shell"),

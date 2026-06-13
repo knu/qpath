@@ -85,6 +85,16 @@ enum Command {
         #[arg(long, value_enum, default_value = "abbr")]
         sort_by: SortBy,
     },
+    /// Sort and reformat a definition file
+    #[command(alias = "fmt")]
+    Format {
+        /// Definition file to edit
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Sort entries by this field
+        #[arg(long, value_enum, default_value = "abbr")]
+        sort_by: SortBy,
+    },
     /// Manage cache files
     Cache {
         #[command(subcommand)]
@@ -151,6 +161,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             file,
             sort_by,
         } => commands::rm(&dirs, &abbr, file, sort_by),
+        Command::Format { file, sort_by } => commands::format(&dirs, file, sort_by),
         Command::Cache {
             command: CacheCommand::Clear { target },
         } => commands::cache_clear(&dirs, target),

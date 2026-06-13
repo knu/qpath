@@ -380,6 +380,48 @@ fn rm_entry() {
 }
 
 #[test]
+fn format_sorts_file() {
+    let sb = Sandbox::new();
+    // Trailing spaces and extra blank lines should be tidied away.
+    sb.write_config(
+        "paths.toml",
+        "# header  \n\n\n[[path]]   \nabbr = \"z\"  \npath = \"~/z/\"\n\n\n\n[[path]]\nabbr = \"a\"\npath = \"~/a/\"\n\n\n",
+    );
+    // `fmt` is an alias and sorts by abbr by default.
+    sb.ok(&["fmt"]);
+    let text = sb.read_config("paths.toml");
+    assert_eq!(
+        text,
+        "# header\n\n[[path]]\nabbr = \"a\"\npath = \"~/a/\"\n\n[[path]]\nabbr = \"z\"\npath = \"~/z/\"\n",
+        "sorted, header on top, whitespace tidied"
+    );
+
+    // --sort-by path reorders by path instead.  Pass --file as an absolute
+    // path since it is resolved against the working directory, not HOME.
+    sb.write_config(
+        "paths.d/x.toml",
+        "[[path]]\nabbr = \"a\"\npath = \"~/z/\"\n\n[[path]]\nabbr = \"z\"\npath = \"~/a/\"\n",
+    );
+    let x_file = sb.config_dir().join("paths.d/x.toml");
+    sb.ok(&[
+        "format",
+        "--file",
+        x_file.to_str().unwrap(),
+        "--sort-by",
+        "path",
+    ]);
+    let text = sb.read_config("paths.d/x.toml");
+    let za = text.find("path = \"~/a/\"").unwrap();
+    let zz = text.find("path = \"~/z/\"").unwrap();
+    assert!(za < zz, "entries are sorted by path:\n{text}");
+
+    // A missing file is an error.
+    let missing = sb.config_dir().join("paths.d/missing.toml");
+    let err = sb.fail(&["format", "--file", missing.to_str().unwrap()]);
+    assert!(err.contains("does not exist"), "{err}");
+}
+
+#[test]
 fn edit_preserves_comments() {
     let sb = Sandbox::new();
     sb.write_config(
