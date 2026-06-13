@@ -12,8 +12,7 @@ use crate::model::{CacheTarget, Entry, Format, PathType, SortBy};
 
 pub fn ls(dirs: &BaseDirs, type_: PathType, format: Format, expand: bool) -> Result<()> {
     let definitions = load::load(&dirs.qpath_config_dir())?;
-    let mut entries = load::resolve(dirs, &definitions);
-    entries.retain(|e| type_.matches(Path::new(&e.expanded)));
+    let mut entries = load::Resolver::new(dirs, &definitions).resolve_all(type_);
     entries.sort_by(|a, b| a.abbr.cmp(&b.abbr));
     print_entries(dirs, &entries, format, expand)
 }
@@ -26,14 +25,10 @@ pub fn show(
     expand: bool,
 ) -> Result<()> {
     let definitions = load::load(&dirs.qpath_config_dir())?;
-    let entries: Vec<Entry> = load::resolve(dirs, &definitions)
-        .into_iter()
-        .filter(|e| e.abbr == abbr && type_.matches(Path::new(&e.expanded)))
-        .collect();
-    if entries.is_empty() {
-        bail!("'{abbr}' not found");
+    match load::Resolver::new(dirs, &definitions).resolve_abbr(abbr, type_) {
+        Some(e) => print_entries(dirs, &[e], format, expand),
+        None => bail!("'{abbr}' not found"),
     }
-    print_entries(dirs, &entries, format, expand)
 }
 
 fn print_entries(dirs: &BaseDirs, entries: &[Entry], format: Format, expand: bool) -> Result<()> {
@@ -123,33 +118,26 @@ pub fn add(dirs: &BaseDirs, opts: AddOpts) -> Result<()> {
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
-    let indices = edit::find_indices(tables, &opts.abbr);
     let saved = normalize_save_path(&opts.path, &dirs.home, opts.expand);
 
-    if indices.is_empty() {
+    // With --overwrite, replace the last existing entry if there is one;
+    // otherwise (and by default) just append.  Duplicates are allowed because
+    // later definitions win at load time.
+    let existing = if opts.overwrite {
+        edit::find_indices(tables, &opts.abbr).pop()
+    } else {
+        None
+    };
+    if let Some(index) = existing {
+        let t = tables.get_mut(index).unwrap();
+        t["path"] = value(&saved);
+        apply_optional_fields(t, opts.desc.as_deref(), opts.type_);
+    } else {
         let mut t = Table::new();
         t["abbr"] = value(&opts.abbr);
         t["path"] = value(&saved);
         apply_optional_fields(&mut t, opts.desc.as_deref(), opts.type_);
         tables.push(t);
-    } else {
-        if !opts.overwrite {
-            bail!(
-                "'{}' already exists in {} (use --overwrite to update)",
-                opts.abbr,
-                target.display()
-            );
-        }
-        if indices.len() > 1 {
-            bail!(
-                "multiple entries for '{}' in {}",
-                opts.abbr,
-                target.display()
-            );
-        }
-        let t = tables.get_mut(indices[0]).unwrap();
-        t["path"] = value(&saved);
-        apply_optional_fields(t, opts.desc.as_deref(), opts.type_);
     }
 
     edit::sort_tables(tables, opts.sort_by.field());
@@ -172,9 +160,10 @@ pub fn update(dirs: &BaseDirs, opts: UpdateOpts) -> Result<()> {
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
-    let indices = edit::find_indices(tables, &opts.abbr);
-    let index = match indices.len() {
-        0 => {
+    // Update the last matching entry, since later definitions win.
+    let index = match edit::find_indices(tables, &opts.abbr).pop() {
+        Some(index) => index,
+        None => {
             // Point at another file holding the same abbreviation, if any, so
             // the user knows where to look.
             let definitions = load::load(&config_dir)?;
@@ -188,12 +177,6 @@ pub fn update(dirs: &BaseDirs, opts: UpdateOpts) -> Result<()> {
                 None => bail!("'{}' not found in {}", opts.abbr, target.display()),
             }
         }
-        1 => indices[0],
-        _ => bail!(
-            "multiple entries for '{}' in {}",
-            opts.abbr,
-            target.display()
-        ),
     };
 
     let t = tables.get_mut(index).unwrap();
@@ -233,7 +216,7 @@ pub fn rename(
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
-    let index = single_index(tables, abbr, &target)?;
+    let index = last_index(tables, abbr, &target)?;
     tables.get_mut(index).unwrap()["abbr"] = value(new_abbr);
     edit::sort_tables(tables, sort_by.field());
     edit::save(&target, &doc)
@@ -245,7 +228,7 @@ pub fn rm(dirs: &BaseDirs, abbr: &str, file: Option<PathBuf>, sort_by: SortBy) -
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
-    let index = single_index(tables, abbr, &target)?;
+    let index = last_index(tables, abbr, &target)?;
     tables.remove(index);
     edit::sort_tables(tables, sort_by.field());
     edit::save(&target, &doc)
@@ -277,13 +260,11 @@ pub fn cache_clear(dirs: &BaseDirs, target: Option<CacheTarget>) -> Result<()> {
     }
 }
 
-fn single_index(tables: &toml_edit::ArrayOfTables, abbr: &str, target: &Path) -> Result<usize> {
-    let indices = edit::find_indices(tables, abbr);
-    match indices.len() {
-        0 => bail!("'{}' not found in {}", abbr, target.display()),
-        1 => Ok(indices[0]),
-        _ => bail!("multiple entries for '{}' in {}", abbr, target.display()),
-    }
+/// Index of the last entry with this abbreviation, since later definitions win.
+fn last_index(tables: &toml_edit::ArrayOfTables, abbr: &str, target: &Path) -> Result<usize> {
+    edit::find_indices(tables, abbr)
+        .pop()
+        .with_context(|| format!("'{}' not found in {}", abbr, target.display()))
 }
 
 fn display_path(entry: &Entry, expand: bool, dirs: &BaseDirs) -> String {

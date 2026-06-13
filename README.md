@@ -18,12 +18,14 @@ Or from a checkout:
 
 ## Configuration
 
-Definitions are loaded from:
+Definitions are loaded from, in this order:
 
 ```text
 ~/.config/qpath/paths.toml      # default target for editing commands
-~/.config/qpath/paths.d/*.toml
+~/.config/qpath/paths.d/*.toml  # sorted by file name
 ```
+
+The same abbreviation may be defined more than once; like `git config`, the last definition in load order wins (among entries that pass type and existence filtering).  This lets a later file under `paths.d/` override an entry from `paths.toml`.
 
 Each `[[path]]` table defines one entry:
 
@@ -105,7 +107,7 @@ gh	GitHub	/Users/you/src/github.com/	~/src/github.com/
 % qpath format
 ```
 
-Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add --overwrite` updates an existing entry in the target file, preserving fields not given on the command line.  `qpath update <abbr> [path]` updates an existing entry in the target file the same way, but errors if the abbreviation is not present there; the path is optional, so it can change only `--desc` or `--type`.  Both commands only edit the target file, and warn (add) or point at the other file in the error (update) when the same abbreviation also lives elsewhere.  `qpath format` re-sorts a file edited by hand and tidies its whitespace (trailing spaces, repeated blank lines).  `remove` is an alias for `rm`, and `fmt` for `format`.
+Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add` always appends an entry, so the same abbreviation may appear more than once; `--overwrite` instead replaces the last existing entry in the target file (or appends if there is none), preserving fields not given on the command line.  `qpath update <abbr> [path]` updates the last existing entry in the target file the same way, but errors if the abbreviation is not present there; the path is optional, so it can change only `--desc` or `--type`.  Both commands only edit the target file, and warn (add) or point at the other file in the error (update) when the same abbreviation also lives elsewhere.  `qpath format` re-sorts a file edited by hand and tidies its whitespace (trailing spaces, repeated blank lines).  `remove` is an alias for `rm`, and `fmt` for `format`.
 
 ### Cache
 

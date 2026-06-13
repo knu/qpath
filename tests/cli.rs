@@ -165,6 +165,85 @@ fn show_exact_abbr() {
 }
 
 #[test]
+fn duplicate_abbr_last_wins() {
+    let sb = Sandbox::new();
+    fs::create_dir_all(sb.home().join("a")).unwrap();
+    fs::create_dir_all(sb.home().join("b")).unwrap();
+    fs::create_dir_all(sb.home().join("c")).unwrap();
+    // paths.toml loads before paths.d/*.toml; within a file, definition order
+    // applies.  The last definition of "x" in load order wins.
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"x\"\npath = \"~/a/\"\n\n[[path]]\nabbr = \"x\"\npath = \"~/b/\"\n",
+    );
+    sb.write_config(
+        "paths.d/later.toml",
+        "[[path]]\nabbr = \"x\"\npath = \"~/c/\"\n",
+    );
+    let home = sb.home().display().to_string();
+
+    // ls collapses duplicates to a single, last-wins entry.
+    let out = sb.ok(&["ls"]);
+    assert_eq!(out, format!("x\t~/c/\t{home}/c/\t~/c/\n"));
+    // show resolves to the same winner.
+    assert_eq!(sb.ok(&["show", "x"]), format!("x\t~/c/\t{home}/c/\t~/c/\n"));
+
+    // If the load-order winner is filtered out (here ~/c/ removed), the next
+    // surviving entry in order wins.
+    std::fs::remove_dir(sb.home().join("c")).unwrap();
+    assert_eq!(sb.ok(&["show", "x"]), format!("x\t~/b/\t{home}/b/\t~/b/\n"));
+}
+
+#[test]
+fn show_stops_at_first_surviving_candidate() {
+    let sb = Sandbox::new();
+    fs::create_dir_all(sb.home().join("win")).unwrap();
+    // Two definitions of "x"; the later one survives.  Each runs a shell
+    // command that records that it was evaluated.  Resolving from the end
+    // should stop at the winner and never evaluate the earlier candidate.
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\n\
+         abbr = \"x\"\n\
+         path = \"{{ 'touch $HOME/early_ran; echo $HOME/early' | shell }}/\"\n\n\
+         [[path]]\n\
+         abbr = \"x\"\n\
+         path = \"{{ 'touch $HOME/late_ran; echo $HOME/win' | shell }}/\"\n",
+    );
+    let home = sb.home().display().to_string();
+    assert_eq!(
+        sb.ok(&["show", "x"]),
+        format!("x\t~/win/\t{home}/win/\t~/win/\n")
+    );
+    assert!(sb.home().join("late_ran").exists(), "winner was evaluated");
+    assert!(
+        !sb.home().join("early_ran").exists(),
+        "earlier candidate must not be evaluated"
+    );
+}
+
+#[test]
+fn edit_targets_last_duplicate() {
+    let sb = Sandbox::new();
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"x\"\npath = \"~/a/\"\n\n[[path]]\nabbr = \"x\"\npath = \"~/b/\"\n",
+    );
+    // update edits the last matching entry, leaving the earlier one intact.
+    sb.ok(&["update", "x", "~/c/", "--sort-by", "path"]);
+    let text = sb.read_config("paths.toml");
+    assert!(text.contains("path = \"~/a/\""), "first kept:\n{text}");
+    assert!(text.contains("path = \"~/c/\""), "last updated:\n{text}");
+    assert!(!text.contains("path = \"~/b/\""), "last replaced:\n{text}");
+
+    // rm removes the last matching entry only.
+    sb.ok(&["rm", "x"]);
+    let text = sb.read_config("paths.toml");
+    assert!(text.contains("path = \"~/a/\""), "first kept:\n{text}");
+    assert!(!text.contains("path = \"~/c/\""), "last removed:\n{text}");
+}
+
+#[test]
 fn ls_json_and_expand() {
     let sb = basic_sandbox();
     let home = sb.home().display().to_string();
@@ -330,16 +409,33 @@ fn add_creates_sorted_file() {
 #[test]
 fn add_duplicate_handling() {
     let sb = Sandbox::new();
-    sb.ok(&["add", "gh", "~/src/github.com/", "--desc", "GitHub"]);
-
-    let err = sb.fail(&["add", "gh", "~/elsewhere/"]);
-    assert!(err.contains("already exists"), "{err}");
-
-    sb.ok(&["add", "gh", "~/src/gitlab.com/", "--overwrite"]);
+    // add always appends; duplicates are allowed and resolved by last-wins.
+    sb.ok(&["add", "gh", "~/a/"]);
+    sb.ok(&["add", "gh", "~/b/"]);
     let text = sb.read_config("paths.toml");
-    assert!(text.contains("path = \"~/src/gitlab.com/\""), "{text}");
-    // desc is preserved when --desc is not given.
-    assert!(text.contains("desc = \"GitHub\""), "{text}");
+    assert_eq!(
+        text.matches("abbr = \"gh\"").count(),
+        2,
+        "two entries:\n{text}"
+    );
+    assert!(text.contains("path = \"~/a/\""), "{text}");
+    assert!(text.contains("path = \"~/b/\""), "{text}");
+
+    // --overwrite replaces the last existing entry instead of appending.
+    sb.ok(&["add", "gh", "~/c/", "--overwrite"]);
+    let text = sb.read_config("paths.toml");
+    assert_eq!(
+        text.matches("abbr = \"gh\"").count(),
+        2,
+        "still two:\n{text}"
+    );
+    assert!(text.contains("path = \"~/a/\""), "first kept:\n{text}");
+    assert!(text.contains("path = \"~/c/\""), "last replaced:\n{text}");
+    assert!(!text.contains("path = \"~/b/\""), "last replaced:\n{text}");
+
+    // --overwrite on a missing abbreviation appends rather than erroring.
+    sb.ok(&["add", "new", "~/new/", "--overwrite"]);
+    assert!(sb.read_config("paths.toml").contains("abbr = \"new\""));
 }
 
 #[test]

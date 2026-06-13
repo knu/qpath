@@ -58,13 +58,31 @@ pub fn load(config_dir: &Path) -> Result<Definitions> {
     Ok(Definitions { defs, vars })
 }
 
-/// Render templates, apply type defaults, and drop entries whose paths do not
-/// exist or do not match their type.  Render and type errors are reported to
-/// stderr and the entry is skipped.
-pub fn resolve(dirs: &BaseDirs, definitions: &Definitions) -> Vec<Entry> {
-    let env = template::build_env(dirs, &definitions.vars);
-    let mut entries = Vec::new();
-    for loaded in &definitions.defs {
+/// Renders path templates and applies the type/existence filter, on demand.
+///
+/// Templates may run shell commands or globs, so definitions are evaluated
+/// only when needed.  When an abbreviation is defined more than once, the last
+/// surviving definition in load order wins (like `git config`), so callers
+/// evaluate candidates from the end and stop at the first that survives.
+pub struct Resolver<'a> {
+    env: minijinja::Environment<'static>,
+    home: std::path::PathBuf,
+    defs: &'a [LoadedDef],
+}
+
+impl<'a> Resolver<'a> {
+    pub fn new(dirs: &BaseDirs, definitions: &'a Definitions) -> Self {
+        Resolver {
+            env: template::build_env(dirs, &definitions.vars),
+            home: dirs.home.clone(),
+            defs: &definitions.defs,
+        }
+    }
+
+    /// Evaluate one definition, returning the entry if it renders and its
+    /// rendered path matches its type.  Render and type errors are reported to
+    /// stderr; filtered-out and erroring definitions both yield `None`.
+    fn eval(&self, loaded: &LoadedDef) -> Option<Entry> {
         let def = &loaded.def;
         let warn = |msg: &dyn std::fmt::Display| {
             eprintln!(
@@ -73,11 +91,11 @@ pub fn resolve(dirs: &BaseDirs, definitions: &Definitions) -> Vec<Entry> {
                 def.abbr
             );
         };
-        let rendered = match env.render_str(&def.path, context! {}) {
+        let rendered = match self.env.render_str(&def.path, context! {}) {
             Ok(s) => s,
             Err(e) => {
                 warn(&e);
-                continue;
+                return None;
             }
         };
         let type_ = match &def.type_ {
@@ -85,21 +103,52 @@ pub fn resolve(dirs: &BaseDirs, definitions: &Definitions) -> Vec<Entry> {
                 Ok(t) => t,
                 Err(e) => {
                     warn(&e);
-                    continue;
+                    return None;
                 }
             },
             None => PathType::infer(&rendered),
         };
-        let expanded = expand_tilde(&rendered, &dirs.home);
+        let expanded = expand_tilde(&rendered, &self.home);
         if !type_.matches(Path::new(&expanded)) {
-            continue;
+            return None;
         }
-        entries.push(Entry {
+        Some(Entry {
             abbr: def.abbr.clone(),
             desc: def.desc.clone(),
             expanded,
             type_,
-        });
+        })
     }
-    entries
+
+    /// Resolve the winning entry for one abbreviation under the `type_`
+    /// filter, or `None` if no matching definition survives.  Candidates are
+    /// evaluated from the last in load order and the first that both exists
+    /// and matches `type_` wins; earlier candidates are not evaluated.
+    pub fn resolve_abbr(&self, abbr: &str, type_: PathType) -> Option<Entry> {
+        self.defs
+            .iter()
+            .rev()
+            .filter(|loaded| loaded.def.abbr == abbr)
+            .find_map(|loaded| {
+                self.eval(loaded)
+                    .filter(|e| type_.matches(Path::new(&e.expanded)))
+            })
+    }
+
+    /// Resolve every distinct abbreviation to its winning entry, in first-seen
+    /// load order.  For each abbreviation, candidates are evaluated from the
+    /// last in load order and evaluation stops at the first survivor.
+    pub fn resolve_all(&self, type_: PathType) -> Vec<Entry> {
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut order: Vec<&str> = Vec::new();
+        for loaded in self.defs {
+            if seen.insert(loaded.def.abbr.as_str()) {
+                order.push(loaded.def.abbr.as_str());
+            }
+        }
+        order
+            .into_iter()
+            .filter_map(|abbr| self.resolve_abbr(abbr, type_))
+            .collect()
+    }
 }
