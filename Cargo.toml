@@ -1,0 +1,27 @@
+[package]
+name = "qpath"
+version = "0.1.0"
+edition = "2024"
+authors = ["Akinori Musha <knu@idaemons.org>"]
+description = "Register, list, and maintain frequently used file and directory paths"
+license = "MIT"
+repository = "https://github.com/knu/qpath"
+readme = "README.md"
+keywords = ["path", "bookmark", "cli"]
+categories = ["command-line-utilities"]
+exclude = ["QPath.md"]
+
+[dependencies]
+anyhow = "1"
+brace-expand = "0.1"
+clap = { version = "4", features = ["derive"] }
+glob = "0.3"
+libc = "0.2"
+minijinja = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+toml_edit = "0.23"
+
+[dev-dependencies]
+tempfile = "3"
