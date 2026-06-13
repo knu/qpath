@@ -312,15 +312,26 @@ fn add_duplicate_handling() {
 }
 
 #[test]
-fn add_refuses_entry_defined_elsewhere() {
+fn add_warns_when_defined_elsewhere() {
     let sb = Sandbox::new();
     sb.write_config(
         "paths.d/common.toml",
         "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
     );
-    let err = sb.fail(&["add", "gh", "~/other/", "--overwrite"]);
-    assert!(err.contains("paths.d/common.toml"), "{err}");
-    assert!(!sb.config_dir().join("paths.toml").exists());
+    // Adding to the default file succeeds but warns about the other entry.
+    let out = sb.run(&["add", "gh", "~/other/"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("warning"), "{stderr}");
+    assert!(stderr.contains("paths.d/common.toml"), "{stderr}");
+    assert!(
+        sb.read_config("paths.toml").contains("path = \"~/other/\""),
+        "the entry was added to the target file"
+    );
 }
 
 #[test]
@@ -332,6 +343,49 @@ fn add_expand_saves_absolute_path() {
     assert!(
         text.contains(&format!("path = \"{home}/src/github.com/\"")),
         "{text}"
+    );
+}
+
+#[test]
+fn update_entry() {
+    let sb = Sandbox::new();
+    sb.ok(&["add", "gh", "~/src/github.com/", "--desc", "GitHub"]);
+
+    // Replace the path; desc is preserved when not given.
+    sb.ok(&["update", "gh", "~/src/gitlab.com/"]);
+    let text = sb.read_config("paths.toml");
+    assert!(text.contains("path = \"~/src/gitlab.com/\""), "{text}");
+    assert!(text.contains("desc = \"GitHub\""), "{text}");
+
+    // Omitting the path updates only desc/type.
+    sb.ok(&["update", "gh", "--desc", "GitLab", "--type", "d"]);
+    let text = sb.read_config("paths.toml");
+    assert!(text.contains("path = \"~/src/gitlab.com/\""), "{text}");
+    assert!(text.contains("desc = \"GitLab\""), "{text}");
+    assert!(text.contains("type = \"directory\""), "{text}");
+
+    // Updating a missing abbreviation is an error.
+    let err = sb.fail(&["update", "nope", "~/x/"]);
+    assert!(err.contains("not found"), "{err}");
+}
+
+#[test]
+fn update_only_edits_target_file() {
+    let sb = Sandbox::new();
+    sb.write_config(
+        "paths.d/common.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
+    );
+    // update only edits the target file (default paths.toml); an entry
+    // defined elsewhere is not found, but the error points at the other file.
+    let err = sb.fail(&["update", "gh", "~/other/"]);
+    assert!(err.contains("not found"), "{err}");
+    assert!(err.contains("paths.d/common.toml"), "{err}");
+    // The other file is left untouched.
+    assert!(
+        sb.read_config("paths.d/common.toml")
+            .contains("path = \"~/src/github.com/\""),
+        "other file unchanged"
     );
 }
 

@@ -89,29 +89,26 @@ pub fn add(dirs: &BaseDirs, opts: AddOpts) -> Result<()> {
     let definitions = load::load(&config_dir)?;
     let elsewhere = first_elsewhere(&definitions, &opts.abbr, &target);
 
+    // The same abbreviation living in another file is allowed, but worth
+    // pointing out since this edit will not touch that entry.
+    if let Some(file) = elsewhere {
+        eprintln!(
+            "qpath: warning: '{}' is also defined in {}",
+            opts.abbr,
+            file.display()
+        );
+    }
+
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
     let indices = edit::find_indices(tables, &opts.abbr);
     let saved = normalize_save_path(&opts.path, &dirs.home, opts.expand);
 
     if indices.is_empty() {
-        if let Some(file) = elsewhere {
-            bail!(
-                "'{}' is already defined in {}; pass --file {} to update it",
-                opts.abbr,
-                file.display(),
-                file.display()
-            );
-        }
         let mut t = Table::new();
         t["abbr"] = value(&opts.abbr);
         t["path"] = value(&saved);
-        if let Some(desc) = &opts.desc {
-            t["desc"] = value(desc);
-        }
-        if let Some(type_) = opts.type_ {
-            t["type"] = value(type_.name());
-        }
+        apply_optional_fields(&mut t, opts.desc.as_deref(), opts.type_);
         tables.push(t);
     } else {
         if !opts.overwrite {
@@ -130,16 +127,72 @@ pub fn add(dirs: &BaseDirs, opts: AddOpts) -> Result<()> {
         }
         let t = tables.get_mut(indices[0]).unwrap();
         t["path"] = value(&saved);
-        if let Some(desc) = &opts.desc {
-            t["desc"] = value(desc);
-        }
-        if let Some(type_) = opts.type_ {
-            t["type"] = value(type_.name());
-        }
+        apply_optional_fields(t, opts.desc.as_deref(), opts.type_);
     }
 
     edit::sort_tables(tables, opts.sort_by.field());
     edit::save(&target, &doc)
+}
+
+pub struct UpdateOpts {
+    pub abbr: String,
+    pub path: Option<String>,
+    pub type_: Option<PathType>,
+    pub desc: Option<String>,
+    pub file: Option<PathBuf>,
+    pub sort_by: SortBy,
+    pub expand: bool,
+}
+
+pub fn update(dirs: &BaseDirs, opts: UpdateOpts) -> Result<()> {
+    let config_dir = dirs.qpath_config_dir();
+    let target = resolve_target(opts.file.as_deref(), dirs, &config_dir);
+
+    let mut doc = edit::open_doc(&target)?;
+    let tables = edit::path_tables(&mut doc)?;
+    let indices = edit::find_indices(tables, &opts.abbr);
+    let index = match indices.len() {
+        0 => {
+            // Point at another file holding the same abbreviation, if any, so
+            // the user knows where to look.
+            let definitions = load::load(&config_dir)?;
+            match first_elsewhere(&definitions, &opts.abbr, &target) {
+                Some(file) => bail!(
+                    "'{}' not found in {}; it is defined in {}",
+                    opts.abbr,
+                    target.display(),
+                    file.display()
+                ),
+                None => bail!("'{}' not found in {}", opts.abbr, target.display()),
+            }
+        }
+        1 => indices[0],
+        _ => bail!(
+            "multiple entries for '{}' in {}",
+            opts.abbr,
+            target.display()
+        ),
+    };
+
+    let t = tables.get_mut(index).unwrap();
+    if let Some(path) = &opts.path {
+        t["path"] = value(normalize_save_path(path, &dirs.home, opts.expand));
+    }
+    apply_optional_fields(t, opts.desc.as_deref(), opts.type_);
+
+    edit::sort_tables(tables, opts.sort_by.field());
+    edit::save(&target, &doc)
+}
+
+/// Set `desc` and `type` on an existing entry when given, leaving them
+/// untouched otherwise.
+fn apply_optional_fields(t: &mut Table, desc: Option<&str>, type_: Option<PathType>) {
+    if let Some(desc) = desc {
+        t["desc"] = value(desc);
+    }
+    if let Some(type_) = type_ {
+        t["type"] = value(type_.name());
+    }
 }
 
 pub fn rename(

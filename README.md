@@ -97,12 +97,13 @@ gh	GitHub	/Users/you/src/github.com/	~/src/github.com/
 
 ```console
 % qpath add gh ~/src/github.com/ --desc GitHub
+% qpath update gh ~/src/gitlab.com/
 % qpath rename gh hub
 % qpath rm hub
 % qpath format
 ```
 
-Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add --overwrite` updates an existing entry in the target file, preserving fields not given on the command line; adding an abbreviation defined in another file is an error.  `qpath format` re-sorts a file edited by hand and tidies its whitespace (trailing spaces, repeated blank lines).  `remove` is an alias for `rm`, and `fmt` for `format`.
+Editing commands target `~/.config/qpath/paths.toml` by default; `--file` selects another definition file.  They preserve comments and formatting, and keep entries sorted (`--sort-by abbr|path`).  `qpath add --overwrite` updates an existing entry in the target file, preserving fields not given on the command line.  `qpath update <abbr> [path]` updates an existing entry in the target file the same way, but errors if the abbreviation is not present there; the path is optional, so it can change only `--desc` or `--type`.  Both commands only edit the target file, and warn (add) or point at the other file in the error (update) when the same abbreviation also lives elsewhere.  `qpath format` re-sorts a file edited by hand and tidies its whitespace (trailing spaces, repeated blank lines).  `remove` is an alias for `rm`, and `fmt` for `format`.
 
 ### Cache
 

@@ -63,6 +63,26 @@ enum Command {
         #[arg(long)]
         expand: bool,
     },
+    /// Update an existing path definition
+    Update {
+        abbr: String,
+        path: Option<String>,
+        /// Path type (directory, file, existent)
+        #[arg(long = "type", value_name = "TYPE", value_parser = PathType::parse)]
+        type_: Option<PathType>,
+        /// Description
+        #[arg(long)]
+        desc: Option<String>,
+        /// Definition file to edit
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Sort entries by this field after editing
+        #[arg(long, value_enum, default_value = "abbr")]
+        sort_by: SortBy,
+        /// Save the path as an expanded absolute path
+        #[arg(long)]
+        expand: bool,
+    },
     /// Rename a path abbreviation
     Rename {
         abbr: String,
@@ -147,6 +167,26 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 file,
                 sort_by,
                 overwrite,
+                expand,
+            },
+        ),
+        Command::Update {
+            abbr,
+            path,
+            type_,
+            desc,
+            file,
+            sort_by,
+            expand,
+        } => commands::update(
+            &dirs,
+            commands::UpdateOpts {
+                abbr,
+                path,
+                type_,
+                desc,
+                file,
+                sort_by,
                 expand,
             },
         ),
