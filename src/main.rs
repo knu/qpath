@@ -40,6 +40,20 @@ enum Command {
         #[arg(long)]
         expand: bool,
     },
+    /// Show a single path definition by exact abbreviation
+    Show {
+        abbr: String,
+        /// Filter by path type (directory, file, existent)
+        #[arg(long = "type", value_name = "TYPE", value_parser = PathType::parse,
+              default_value = "existent")]
+        type_: PathType,
+        /// Output format
+        #[arg(long, value_enum, default_value = "tsv")]
+        format: Format,
+        /// Output expanded absolute paths
+        #[arg(long)]
+        expand: bool,
+    },
     /// Add or update a path definition
     Add {
         abbr: String,
@@ -148,6 +162,12 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             format,
             expand,
         } => commands::ls(&dirs, type_, format, expand),
+        Command::Show {
+            abbr,
+            type_,
+            format,
+            expand,
+        } => commands::show(&dirs, &abbr, type_, format, expand),
         Command::Add {
             abbr,
             path,

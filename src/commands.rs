@@ -15,9 +15,31 @@ pub fn ls(dirs: &BaseDirs, type_: PathType, format: Format, expand: bool) -> Res
     let mut entries = load::resolve(dirs, &definitions);
     entries.retain(|e| type_.matches(Path::new(&e.expanded)));
     entries.sort_by(|a, b| a.abbr.cmp(&b.abbr));
+    print_entries(dirs, &entries, format, expand)
+}
+
+pub fn show(
+    dirs: &BaseDirs,
+    abbr: &str,
+    type_: PathType,
+    format: Format,
+    expand: bool,
+) -> Result<()> {
+    let definitions = load::load(&dirs.qpath_config_dir())?;
+    let entries: Vec<Entry> = load::resolve(dirs, &definitions)
+        .into_iter()
+        .filter(|e| e.abbr == abbr && type_.matches(Path::new(&e.expanded)))
+        .collect();
+    if entries.is_empty() {
+        bail!("'{abbr}' not found");
+    }
+    print_entries(dirs, &entries, format, expand)
+}
+
+fn print_entries(dirs: &BaseDirs, entries: &[Entry], format: Format, expand: bool) -> Result<()> {
     match format {
         Format::Tsv => {
-            for e in &entries {
+            for e in entries {
                 let display = display_path(e, expand, dirs);
                 let desc = e.desc.as_deref().unwrap_or(&display);
                 println!(

@@ -134,6 +134,37 @@ fn ls_type_filter() {
 }
 
 #[test]
+fn show_exact_abbr() {
+    let sb = basic_sandbox();
+    let home = sb.home().display().to_string();
+
+    // Exact match only; no prefix matching.
+    let out = sb.ok(&["show", "gh"]);
+    assert_eq!(
+        out,
+        format!("gh\tGitHub\t{home}/src/github.com/\t~/src/github.com/\n")
+    );
+
+    // --type and --format apply just like ls.
+    let out = sb.ok(&["show", "i", "--format", "json"]);
+    let items: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(items.as_array().unwrap().len(), 1);
+    assert_eq!(items[0]["abbr"], "i");
+
+    // A type mismatch filters the entry out, leaving nothing to show.
+    let err = sb.fail(&["show", "gh", "--type", "f"]);
+    assert!(err.contains("not found"), "{err}");
+
+    // An unknown abbreviation is not found.
+    let err = sb.fail(&["show", "nope"]);
+    assert!(err.contains("not found"), "{err}");
+
+    // A defined but nonexistent path is filtered by the default type.
+    let err = sb.fail(&["show", "missing"]);
+    assert!(err.contains("not found"), "{err}");
+}
+
+#[test]
 fn ls_json_and_expand() {
     let sb = basic_sandbox();
     let home = sb.home().display().to_string();

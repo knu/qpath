@@ -93,6 +93,8 @@ gh	GitHub	/Users/you/src/github.com/	~/src/github.com/
 
 `qpath ls [--type TYPE] [--format tsv|json] [--expand]` lists entries as `abbr`, `desc`, `path`, `shell_path` TSV columns or a JSON array.  `path` is the raw absolute path, ready to pass to file APIs.  `shell_path` is quoted for direct insertion into a shell command line, with a leading `~/` left unquoted so it stays expandable.  When `desc` is missing, the `~/`-shortened path is shown instead.  `--type` filters by what the path is on disk (default `existent`), and `--expand` makes `desc` and `shell_path` use absolute paths instead of shortening under `~/`.  `list` is an alias for `ls`.
 
+`qpath show <abbr> [--type TYPE] [--format tsv|json] [--expand]` prints the single entry whose abbreviation matches exactly, in the same columns as `ls`, and errors if no such entry exists (or is filtered out by `--type`).
+
 ### Editing
 
 ```console
