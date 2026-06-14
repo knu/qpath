@@ -11,6 +11,17 @@ keywords = ["path", "bookmark", "cli"]
 categories = ["command-line-utilities"]
 exclude = ["QPath.md"]
 
+[package.metadata.release]
+# crates.io publishing is handled by the CI trusted-publishing workflow on a
+# pushed tag, not by cargo-release.  Pushing is left manual so the release tag
+# (the CI trigger) is created locally and pushed deliberately.
+publish = false
+push = false
+pre-release-commit-message = "Bump version to {{version}}"
+tag-message = "Release version {{version}}"
+# Refresh CHANGELOG.md for the new version before the release commit.
+pre-release-hook = ["sh", "-c", "git-cliff --tag \"v$NEW_VERSION\" --output CHANGELOG.md"]
+
 [dependencies]
 anyhow = "1"
 brace-expand = "0.1"
