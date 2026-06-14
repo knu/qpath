@@ -67,6 +67,25 @@ Each element is a transient group vector."
 (defvar qpath--update-timer nil
   "Timer used to refresh qpath caches.")
 
+(defun qpath--suffix-symbol (kind key path)
+  "Return an internal suffix symbol for KIND, KEY, and PATH."
+  (intern (format "qpath--%s-%s"
+                  kind
+                  (secure-hash 'sha1 (format "%s\0%s\0%s" kind key path)))))
+
+(defun qpath--make-visit-file-command (path)
+  "Return a command that visits PATH."
+  (lambda ()
+    (interactive)
+    (find-file path)
+    (run-hook-with-args 'qpath-after-visit-file-functions path)))
+
+(defun qpath--make-insert-directory-command (shell-path)
+  "Return a command to insert SHELL-PATH at point."
+  (lambda ()
+    (interactive)
+    (insert shell-path)))
+
 (defun qpath--read (type)
   "Return registered qpath entries of TYPE."
   (unless (executable-find qpath-command)
@@ -89,14 +108,11 @@ Each element is a transient group vector."
            for key = (qpath--entry entry "abbr")
            for desc = (qpath--entry entry "desc")
            for path = (qpath--entry entry "path")
+           for command = (and key path
+                              (qpath--suffix-symbol "visit-file" key path))
            when (and key desc path)
-           collect `(,key
-                     ,desc
-                     (lambda ()
-                       (interactive)
-                       (find-file ,path)
-                       (run-hook-with-args
-                        'qpath-after-visit-file-functions ,path))
+           do (fset command (qpath--make-visit-file-command path))
+           collect `(,key ,desc ,command
                      :if (lambda () (file-exists-p ,path)))))
 
 (defun qpath--directory-suffixes ()
@@ -106,12 +122,13 @@ Each element is a transient group vector."
            for desc = (qpath--entry entry "desc")
            for path = (qpath--entry entry "path")
            for shell-path = (qpath--entry entry "shell_path")
+           for command = (and key path
+                              (qpath--suffix-symbol "insert-directory"
+                                                    key path))
            when (and key desc path shell-path)
-           collect `(,key
-                     ,desc
-                     (lambda ()
-                       (interactive)
-                       (insert ,shell-path))
+           do (fset command
+                    (qpath--make-insert-directory-command shell-path))
+           collect `(,key ,desc ,command
                      :if (lambda () (file-directory-p ,path)))))
 
 (defun qpath--define-transients ()
@@ -119,12 +136,12 @@ Each element is a transient group vector."
   (eval
    `(transient-define-prefix qpath--visit-file-transient ()
       "Visit a registered file."
-      ,@(append (list `["Visit" ,@(qpath--file-suffixes)])
+      ,(vconcat (list `["Visit" ,@(qpath--file-suffixes)])
                 qpath-visit-file-extra-sections)))
   (eval
    `(transient-define-prefix qpath--insert-directory-transient ()
       "Insert a registered directory."
-      ,@(append (list `["Insert" ,@(qpath--directory-suffixes)])
+      ,(vconcat (list `["Insert" ,@(qpath--directory-suffixes)])
                 qpath-insert-directory-extra-sections))))
 
 (defun qpath-update (&optional quiet)
