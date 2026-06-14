@@ -1,0 +1,72 @@
+name: Emacs Lisp
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+    paths:
+      - lisp/**
+      - tests/**/*.el
+  pull_request:
+    paths:
+      - lisp/**
+      - tests/**/*.el
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Emacs Lisp (${{ matrix.emacs-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs-version:
+          - "29.1"
+          - "30.2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Emacs
+        uses: purcell/setup-emacs@bdc64dc730ae1fcba200bfd52cb1b4cf6159cbe5  # v8.0
+        with:
+          version: ${{ matrix.emacs-version }}
+
+      - name: Install package-lint
+        run: |
+          set -euo pipefail
+          emacs -Q --batch \
+            --eval "(require 'package)" \
+            --eval "(add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\"))" \
+            --eval "(package-initialize)" \
+            --eval "(package-refresh-contents)" \
+            --eval "(package-install 'package-lint)"
+
+      - name: Package lint
+        run: |
+          set -euo pipefail
+          emacs -Q --batch \
+            --eval "(require 'package)" \
+            --eval "(package-initialize)" \
+            --eval "(require 'package-lint)" \
+            -f package-lint-batch-and-exit lisp/qpath.el
+
+      - name: Check docstrings
+        run: |
+          set -euo pipefail
+          emacs -Q --batch \
+            --eval "(require 'checkdoc)" \
+            --eval "(unless (checkdoc-file \"lisp/qpath.el\") (kill-emacs 1))"
+
+      - name: Byte compile
+        run: emacs -Q --batch -L lisp -f batch-byte-compile lisp/qpath.el
+
+      - name: Run tests
+        run: emacs -Q --batch -L lisp -l tests/qpath-test.el -f ert-run-tests-batch-and-exit
