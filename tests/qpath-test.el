@@ -105,6 +105,26 @@ esac
             (transient-setup 'qpath--insert-directory-transient)))
       (delete-file file))))
 
+(ert-deftest qpath-transient-setup-accepts-prefix-keys ()
+  (let* ((single-file (make-temp-file "qpath-test-single-file"))
+         (double-file (make-temp-file "qpath-test-double-file"))
+         (single-entry (make-hash-table :test 'equal))
+         (double-entry (make-hash-table :test 'equal)))
+    (unwind-protect
+        (progn
+          (puthash "abbr" "i" single-entry)
+          (puthash "desc" "Single key" single-entry)
+          (puthash "path" single-file single-entry)
+          (puthash "abbr" "ii" double-entry)
+          (puthash "desc" "Double key" double-entry)
+          (puthash "path" double-file double-entry)
+          (let ((qpath--file-cache (list single-entry double-entry))
+                qpath--directory-cache)
+            (qpath--define-transients)
+            (transient-setup 'qpath--visit-file-transient)))
+      (delete-file single-file)
+      (delete-file double-file))))
+
 (provide 'qpath-test)
 
 ;;; qpath-test.el ends here

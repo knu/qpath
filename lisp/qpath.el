@@ -86,6 +86,28 @@ Each element is a transient group vector."
     (interactive)
     (insert shell-path)))
 
+(defun qpath--key-prefix-p (prefix key)
+  "Return non-nil when PREFIX is a prefix key sequence of KEY."
+  (let ((prefix-events (append (kbd prefix) nil))
+        (key-events (append (kbd key) nil)))
+    (and (< (length prefix-events) (length key-events))
+         (cl-loop for prefix-event in prefix-events
+                  for key-event in key-events
+                  always (equal prefix-event key-event)))))
+
+(defun qpath--disambiguate-prefix-keys (suffixes)
+  "Return SUFFIXES with prefix-conflicting keys terminated by RET."
+  (let ((keys (mapcar #'car suffixes)))
+    (mapcar
+     (lambda (suffix)
+       (let ((key (car suffix)))
+         (if (cl-some (lambda (other-key)
+                        (qpath--key-prefix-p key other-key))
+                      keys)
+             (cons (concat key " RET") (cdr suffix))
+           suffix)))
+     suffixes)))
+
 (defun qpath--read (type)
   "Return registered qpath entries of TYPE."
   (unless (executable-find qpath-command)
@@ -113,7 +135,9 @@ Each element is a transient group vector."
            when (and key desc path)
            do (fset command (qpath--make-visit-file-command path))
            collect `(,key ,desc ,command
-                     :if (lambda () (file-exists-p ,path)))))
+                     :if (lambda () (file-exists-p ,path)))
+           into suffixes
+           finally return (qpath--disambiguate-prefix-keys suffixes)))
 
 (defun qpath--directory-suffixes ()
   "Return transient suffixes for registered directories."
@@ -129,7 +153,9 @@ Each element is a transient group vector."
            do (fset command
                     (qpath--make-insert-directory-command shell-path))
            collect `(,key ,desc ,command
-                     :if (lambda () (file-directory-p ,path)))))
+                     :if (lambda () (file-directory-p ,path)))
+           into suffixes
+           finally return (qpath--disambiguate-prefix-keys suffixes)))
 
 (defun qpath--define-transients ()
   "Define transient commands from the qpath cache."
