@@ -8,6 +8,23 @@ version bumps for fixes.  Once `1.0.0` ships, the project will revisit and
 likely adopt strict [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.1.1] - 2026-06-15
+
+
+### Added
+
+- Add Emacs Lisp integration
+- Support custom shells in shell filter
+
+### Fixed
+
+- Fix transient suffix definitions
+- Handle transient prefix key conflicts
+
+### Removed
+
+- Drop Windows release artifacts
+
 ## [0.1.0] - 2026-06-14
 
 - Initial release.
