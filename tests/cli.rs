@@ -319,6 +319,7 @@ type = "directory"
 fn ls_shell_filter() {
     let sb = Sandbox::new();
     fs::create_dir_all(sb.home().join("shdir")).unwrap();
+    fs::create_dir_all(sb.home().join("custom-shell-dir")).unwrap();
     sb.write_config(
         "paths.toml",
         r#"
@@ -326,6 +327,11 @@ fn ls_shell_filter() {
 abbr = "sd"
 path = "{{ 'echo $HOME/shdir' | shell }}/"
 desc = "Shell dir"
+
+[[path]]
+abbr = "cs"
+path = "{{ 'printf %s $HOME/custom-shell-dir' | shell('sh') }}/"
+desc = "Custom shell dir"
 
 [[path]]
 abbr = "bad"
@@ -337,7 +343,10 @@ path = "{{ 'exit 1' | shell }}"
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        format!("sd\tShell dir\t{home}/shdir/\t~/shdir/\n")
+        format!(
+            "cs\tCustom shell dir\t{home}/custom-shell-dir/\t~/custom-shell-dir/\n\
+             sd\tShell dir\t{home}/shdir/\t~/shdir/\n"
+        )
     );
     // The failing command is reported as a warning and the entry is skipped.
     let stderr = String::from_utf8(out.stderr).unwrap();

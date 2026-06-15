@@ -63,7 +63,7 @@ Available filters:
 
 - `glob` — Expand a glob pattern into an array of matching paths.  Brace alternations such as `{a,b}` are expanded first and each alternative is globbed independently; matches are sorted lexically within each alternative and concatenated.  A trailing `/` restricts matches to directories.
 - `vsort` — Sort an array in version-fragment order, so `python3.9` sorts before `python3.10` and `v29.9` before `v29.10`.  Pipe `glob` through this to pick the newest versioned match with `last`.
-- `shell` — Run a command with `sh -c` and return its standard output, trailing newlines stripped like `$(...)`.  `cache_ttl=SECONDS` caches the output per command under `~/.cache/qpath/shell/`; failures are never cached.
+- `shell` — Run a command with `/bin/sh -c` and return its standard output, trailing newlines stripped like `$(...)`.  `shell('zsh')` or another shell name changes the interpreter.  `cache_ttl=SECONDS` caches the output per command and shell under `~/.cache/qpath/shell/`; failures are never cached.
 - MiniJinja built-ins such as `first`, `last`, `sort`, `reverse`, and `join`.
 
 ```toml
@@ -81,6 +81,11 @@ desc = "Package list"
 abbr = "brew"
 path = "{{ 'brew --prefix' | shell(cache_ttl=86400) }}/etc/"
 desc = "Homebrew etc"
+
+[[path]]
+abbr = "zp"
+path = "{{ 'print -r -- $HOME/zsh-project' | shell('zsh') }}"
+desc = "zsh project"
 ```
 
 ## Usage
