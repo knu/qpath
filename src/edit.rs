@@ -59,7 +59,7 @@ pub fn sort_tables(tables: &mut ArrayOfTables, field: &str) {
             format!("\n{comment}")
         };
         t.decor_mut().set_prefix(prefix);
-        t.set_position(i as isize);
+        t.set_position(Some(i as isize));
         rebuilt.push(t);
     }
     *tables = rebuilt;
