@@ -9,20 +9,15 @@ queue_rules:
       - author ~= ^(dependabot|renovate)\[bot\]$
       - -draft
       - -conflict
-      - label != dependencies:major
       - "#approved-reviews-by >= 1"
     merge_conditions:
       - "#approved-reviews-by >= 1"
 
-pull_request_rules:
-  - name: queue approved dependency updates
-    conditions:
-      - base = main
-      - author ~= ^(dependabot|renovate)\[bot\]$
-      - -draft
-      - -conflict
-      - label != dependencies:major
-      - "#approved-reviews-by >= 1"
-    actions:
-      queue:
-        name: dependency-updates
+merge_protections_settings:
+  auto_merge_conditions:
+    - base = main
+    - author ~= ^(dependabot|renovate)\[bot\]$
+    - -draft
+    - -conflict
+    - "#approved-reviews-by >= 1"
+  reporting_method: check-runs
