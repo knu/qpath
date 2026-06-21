@@ -6,7 +6,7 @@ queue_rules:
     merge_method: merge-batch
     queue_conditions:
       - base = main
-      - author = renovate[bot]
+      - author ~= ^(dependabot|renovate)\[bot\]$
       - -draft
       - -conflict
       - label != dependencies:major
@@ -18,7 +18,7 @@ pull_request_rules:
   - name: queue approved dependency updates
     conditions:
       - base = main
-      - author = renovate[bot]
+      - author ~= ^(dependabot|renovate)\[bot\]$
       - -draft
       - -conflict
       - label != dependencies:major
