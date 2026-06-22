@@ -156,7 +156,14 @@ pub struct UpdateOpts {
 
 pub fn update(dirs: &BaseDirs, opts: UpdateOpts) -> Result<()> {
     let config_dir = dirs.qpath_config_dir();
-    let target = resolve_target(opts.file.as_deref(), dirs, &config_dir);
+    let definitions = load::load(&config_dir)?;
+    let target = resolve_existing_target(
+        opts.file.as_deref(),
+        dirs,
+        &config_dir,
+        &definitions,
+        &opts.abbr,
+    )?;
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
@@ -166,7 +173,6 @@ pub fn update(dirs: &BaseDirs, opts: UpdateOpts) -> Result<()> {
         None => {
             // Point at another file holding the same abbreviation, if any, so
             // the user knows where to look.
-            let definitions = load::load(&config_dir)?;
             match first_elsewhere(&definitions, &opts.abbr, &target) {
                 Some(file) => bail!(
                     "'{}' not found in {}; it is defined in {}",
@@ -208,8 +214,8 @@ pub fn rename(
     sort_by: SortBy,
 ) -> Result<()> {
     let config_dir = dirs.qpath_config_dir();
-    let target = resolve_target(file.as_deref(), dirs, &config_dir);
     let definitions = load::load(&config_dir)?;
+    let target = resolve_existing_target(file.as_deref(), dirs, &config_dir, &definitions, abbr)?;
     if let Some(loaded) = definitions.defs.iter().find(|d| d.def.abbr == new_abbr) {
         bail!("'{}' already exists in {}", new_abbr, loaded.file.display());
     }
@@ -224,7 +230,8 @@ pub fn rename(
 
 pub fn rm(dirs: &BaseDirs, abbr: &str, file: Option<PathBuf>, sort_by: SortBy) -> Result<()> {
     let config_dir = dirs.qpath_config_dir();
-    let target = resolve_target(file.as_deref(), dirs, &config_dir);
+    let definitions = load::load(&config_dir)?;
+    let target = resolve_existing_target(file.as_deref(), dirs, &config_dir, &definitions, abbr)?;
 
     let mut doc = edit::open_doc(&target)?;
     let tables = edit::path_tables(&mut doc)?;
@@ -286,6 +293,25 @@ fn resolve_target(file: Option<&Path>, dirs: &BaseDirs, config_dir: &Path) -> Pa
             std::path::absolute(&expanded).unwrap_or_else(|_| PathBuf::from(expanded))
         }
         None => config_dir.join("paths.toml"),
+    }
+}
+
+fn resolve_existing_target(
+    file: Option<&Path>,
+    dirs: &BaseDirs,
+    config_dir: &Path,
+    definitions: &Definitions,
+    abbr: &str,
+) -> Result<PathBuf> {
+    match file {
+        Some(_) => Ok(resolve_target(file, dirs, config_dir)),
+        None => definitions
+            .defs
+            .iter()
+            .rev()
+            .find(|loaded| loaded.def.abbr == abbr)
+            .map(|loaded| loaded.file.clone())
+            .with_context(|| format!("'{}' not found", abbr)),
     }
 }
 

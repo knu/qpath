@@ -506,22 +506,56 @@ fn update_entry() {
 }
 
 #[test]
-fn update_only_edits_target_file() {
+fn update_edits_winning_file_by_default() {
     let sb = Sandbox::new();
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/default/\"\n",
+    );
     sb.write_config(
         "paths.d/common.toml",
         "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
     );
-    // update only edits the target file (default paths.toml); an entry
-    // defined elsewhere is not found, but the error points at the other file.
-    let err = sb.fail(&["update", "gh", "~/other/"]);
-    assert!(err.contains("not found"), "{err}");
-    assert!(err.contains("paths.d/common.toml"), "{err}");
-    // The other file is left untouched.
+    sb.ok(&["update", "gh", "~/other/"]);
+    assert!(
+        sb.read_config("paths.d/common.toml")
+            .contains("path = \"~/other/\""),
+        "winning file was edited"
+    );
+    assert!(
+        sb.read_config("paths.toml")
+            .contains("path = \"~/default/\""),
+        "default file was left untouched"
+    );
+}
+
+#[test]
+fn update_file_option_still_edits_that_file() {
+    let sb = Sandbox::new();
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/default/\"\n",
+    );
+    sb.write_config(
+        "paths.d/common.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
+    );
+    sb.ok(&[
+        "update",
+        "gh",
+        "~/explicit/",
+        "--file",
+        sb.config_dir().join("paths.toml").to_str().unwrap(),
+    ]);
+    assert!(
+        sb.read_config("paths.toml")
+            .contains("path = \"~/explicit/\""),
+        "explicit file was edited"
+    );
     assert!(
         sb.read_config("paths.d/common.toml")
             .contains("path = \"~/src/github.com/\""),
-        "other file unchanged"
+        "winning file was left untouched"
     );
 }
 
@@ -536,6 +570,29 @@ fn rename_entry() {
 
     let err = sb.fail(&["rename", "nope", "x"]);
     assert!(err.contains("not found"), "{err}");
+}
+
+#[test]
+fn rename_edits_winning_file_by_default() {
+    let sb = Sandbox::new();
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/default/\"\n",
+    );
+    sb.write_config(
+        "paths.d/common.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
+    );
+    sb.ok(&["rename", "gh", "hub"]);
+    assert!(
+        sb.read_config("paths.d/common.toml")
+            .contains("abbr = \"hub\""),
+        "winning file was edited"
+    );
+    assert!(
+        sb.read_config("paths.toml").contains("abbr = \"gh\""),
+        "default file was left untouched"
+    );
 }
 
 #[test]
@@ -567,6 +624,29 @@ fn rm_entry() {
     // `remove` is an alias.
     sb.ok(&["remove", "b"]);
     assert!(!sb.read_config("paths.toml").contains("abbr = \"b\""));
+}
+
+#[test]
+fn rm_edits_winning_file_by_default() {
+    let sb = Sandbox::new();
+    sb.write_config(
+        "paths.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/default/\"\n",
+    );
+    sb.write_config(
+        "paths.d/common.toml",
+        "[[path]]\nabbr = \"gh\"\npath = \"~/src/github.com/\"\n",
+    );
+    sb.ok(&["rm", "gh"]);
+    assert!(
+        !sb.read_config("paths.d/common.toml")
+            .contains("abbr = \"gh\""),
+        "winning file entry was removed"
+    );
+    assert!(
+        sb.read_config("paths.toml").contains("abbr = \"gh\""),
+        "default file was left untouched"
+    );
 }
 
 #[test]
