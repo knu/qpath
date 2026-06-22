@@ -47,7 +47,7 @@ sort_commits = "oldest"
 commit_parsers = [
   # Skip commits that are not user-visible.
   { message = "^Initial commit\\b", skip = true },
-  { message = "^Merge\\b", skip = true },
+  { message = "^(Merge|Merged)\\b", skip = true },
   { message = "^Revert\\b", skip = true },
   { message = "^Release v?[0-9]", skip = true },
   # Explicit skip markers in the subject, e.g. "[chore]", "[doc]", "[ci skip]".
@@ -57,16 +57,17 @@ commit_parsers = [
   { message = "(?i)^[^\\n]*\\[(chore|docs?|ci skip|skip ci|skip changelog|no changelog)\\]", skip = true },
   # Note: match "formatter"/"formatting" but not the standalone word "format",
   # which qpath uses for its `format` subcommand (a user-visible feature).
-  { message = "(?i)^[^\\n]*\\b(CI|GitHub Actions?|workflows?|Dependabot|Renovate|Harden-?Runner|pre-?commit|lint(er|ing)?|formatter|formatting|prettier|eslint|rubocop|zizmor|actionlint)\\b", skip = true },
+  { message = "(?i)^[^\\n]*\\b(CI|GitHub Actions?|workflows?|Dependabot|Renovate|Mergify|merge protections?|merge batch|dependency PRs?|Harden-?Runner|pre-?commit|lint(er|ing)?|formatter|formatting|prettier|eslint|rubocop|zizmor|actionlint)\\b", skip = true },
   { message = "(?i)^[^\\n]*\\b(README|docs?|documentation|comment|changelog|license|privacy policy|listing copy)\\b", skip = true },
+  { message = "(?i)^Adapt to .*(API|signature)\\b", skip = true },
   { message = "^(Refactor|Rework|Reformat|Clean ?up|Reorganize|Rename|Move|Format|Tidy|Tweak|Polish|Simplify|Inline|Extract|Restructure|Factor)\\b", skip = true },
   { message = "^(Test|Tests)\\b", skip = true },
 
   # Dependency-bot commits are skipped by author, with subject fallbacks for
   # manual cherry-picks or squash commits.
-  { field = "author.name", pattern = "(?i)(dependabot|renovate)(\\[bot\\])?$", skip = true },
-  { field = "author.email", pattern = "(?i)@(dependabot|renovate)\\b", skip = true },
-  { field = "author.email", pattern = "^[0-9]+\\+(dependabot|renovate)(\\[bot\\])?@", skip = true },
+  { field = "author.name", pattern = "(?i)(dependabot|renovate|mergify)(\\[bot\\])?$", skip = true },
+  { field = "author.email", pattern = "(?i)@(dependabot|renovate|mergify)\\b", skip = true },
+  { field = "author.email", pattern = "^[0-9]+\\+(dependabot|renovate|mergify)(\\[bot\\])?@", skip = true },
   { message = "^Bump\\b", skip = true },
   { message = "^Update dependency\\b", skip = true },
 
