@@ -1,6 +1,6 @@
 [package]
 name = "qpath"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 authors = ["Akinori Musha <knu@idaemons.org>"]
 description = "Register, list, and maintain frequently used file and directory paths"
