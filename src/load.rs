@@ -116,6 +116,7 @@ impl<'a> Resolver<'a> {
             abbr: def.abbr.clone(),
             desc: def.desc.clone(),
             expanded,
+            source: loaded.file.clone(),
             type_,
         })
     }

@@ -57,6 +57,7 @@ fn print_entries(dirs: &BaseDirs, entries: &[Entry], format: Format, expand: boo
                         "desc": desc,
                         "path": e.expanded,
                         "shell_path": shell_path(&display),
+                        "source": e.source.to_string_lossy(),
                         "type": e.type_.name(),
                     })
                 })

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -99,6 +99,8 @@ pub struct Entry {
     /// Absolute path with `~` and templates expanded; a trailing slash from
     /// the definition is preserved.
     pub expanded: String,
+    /// Absolute definition file path that produced this entry.
+    pub source: PathBuf,
     pub type_: PathType,
 }
 

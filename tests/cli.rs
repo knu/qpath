@@ -150,6 +150,10 @@ fn show_exact_abbr() {
     let items: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(items.as_array().unwrap().len(), 1);
     assert_eq!(items[0]["abbr"], "i");
+    assert_eq!(
+        items[0]["source"],
+        sb.config_dir().join("paths.toml").to_str().unwrap()
+    );
 
     // A type mismatch filters the entry out, leaving nothing to show.
     let err = sb.fail(&["show", "gh", "--type", "f"]);
@@ -187,6 +191,12 @@ fn duplicate_abbr_last_wins() {
     assert_eq!(out, format!("x\t~/c/\t{home}/c/\t~/c/\n"));
     // show resolves to the same winner.
     assert_eq!(sb.ok(&["show", "x"]), format!("x\t~/c/\t{home}/c/\t~/c/\n"));
+    let out = sb.ok(&["show", "x", "--format", "json"]);
+    let items: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(
+        items[0]["source"],
+        sb.config_dir().join("paths.d/later.toml").to_str().unwrap()
+    );
 
     // If the load-order winner is filtered out (here ~/c/ removed), the next
     // surviving entry in order wins.
@@ -258,6 +268,7 @@ fn ls_json_and_expand() {
                 "desc": "GitHub",
                 "path": format!("{home}/src/github.com/"),
                 "shell_path": "~/src/github.com/",
+                "source": sb.config_dir().join("paths.toml").to_str().unwrap(),
                 "type": "directory"
             },
             {
@@ -265,6 +276,7 @@ fn ls_json_and_expand() {
                 "desc": "~/init.el",
                 "path": format!("{home}/init.el"),
                 "shell_path": "~/init.el",
+                "source": sb.config_dir().join("paths.toml").to_str().unwrap(),
                 "type": "file"
             }
         ])
