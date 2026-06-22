@@ -7,9 +7,7 @@ While on `0.x.y`, the minor version bumps for new features and the patch
 version bumps for fixes.  Once `1.0.0` ships, the project will revisit and
 likely adopt strict [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [0.1.1] - 2026-06-15
-
 
 ### Added
 

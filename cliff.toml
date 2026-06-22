@@ -20,7 +20,8 @@ body = """
 {%- else -%}
 ## [Unreleased]
 {%- endif %}
-{% if not previous.version %}
+{%- if not previous.version %}
+
 - Initial release.
 {%- else %}
 {% for group, commits in commits | group_by(attribute="group") %}
