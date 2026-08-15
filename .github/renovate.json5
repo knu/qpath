@@ -30,6 +30,13 @@
       minimumReleaseAge: "7 days",
     },
     {
+      // The github-runners datasource has no release timestamps, so
+      // minimumReleaseAge would leave runner PRs pending forever.
+      // https://github.com/renovatebot/renovate/issues/45236
+      matchDepTypes: ["github-runner"],
+      minimumReleaseAge: null,
+    },
+    {
       matchManagers: ["cargo"],
       matchDepTypes: ["dev-dependencies"],
       groupName: "dev dependencies",
