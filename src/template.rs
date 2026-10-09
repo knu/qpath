@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use minijinja::value::Kwargs;
+use minijinja::value::{Kwargs, Serde};
 use minijinja::{Environment, Error, ErrorKind, UndefinedBehavior, Value};
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,7 @@ pub fn build_env(dirs: &BaseDirs, vars: &toml::Table) -> Environment<'static> {
     env.add_global("os", std::env::consts::OS);
     env.add_global("arch", std::env::consts::ARCH);
     for (k, v) in vars {
-        env.add_global(k.clone(), Value::from_serialize(v));
+        env.add_global(k.clone(), Value::from(Serde(v)));
     }
     let home = dirs.home.clone();
     env.add_filter("glob", move |pattern: String| {
